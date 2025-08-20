@@ -23,9 +23,7 @@
           <h1 class="text-lg font-semibold">네이버 스마트스토어 FAQ 챗봇</h1>
         </div>
         <div class="flex items-center gap-2 text-sm">
-          <label class="text-gray-500">API Base</label>
-          <input id="apiBase" class="border rounded-md px-2 py-1 w-56" placeholder="http://localhost:8000" />
-          <button id="saveBase" class="px-3 py-1 rounded-md bg-[#2DB400] text-white">저장</button>
+          <!-- 개발자 설정 제거 - 프로덕션용 -->
         </div>
       </div>
     </header>
@@ -57,8 +55,8 @@
     </main>
 
     <footer class="border-t bg-white">
-      <div class="mx-auto max-w-3xl px-4 py-3 text-xs text-gray-500">
-        Streaming RAG • FastAPI + Chroma + OpenAI • (데모용) 다른 주제는 정중히 거절합니다.
+      <div class="mx-auto max-w-3xl px-4 py-3 text-xs text-gray-500 text-center">
+        네이버 스마트스토어 FAQ 챗봇 • AI 기반 지능형 상담 서비스
       </div>
     </footer>
   </div>
@@ -67,18 +65,9 @@
     const chatEl = document.getElementById('chat');
     const formEl = document.getElementById('composer');
     const inputEl = document.getElementById('message');
-    const apiBaseEl = document.getElementById('apiBase');
-    const saveBaseEl = document.getElementById('saveBase');
 
-
-    const DEFAULT_BASE = 'http://localhost:8000';
-    apiBaseEl.value = localStorage.getItem('apiBase') || DEFAULT_BASE;
-    saveBaseEl.addEventListener('click', (e) => {
-      e.preventDefault();
-      localStorage.setItem('apiBase', apiBaseEl.value.trim() || DEFAULT_BASE);
-      saveBaseEl.textContent = '저장됨';
-      setTimeout(() => (saveBaseEl.textContent = '저장'), 1200);
-    });
+    // 고정된 API Base URL 사용
+    const API_BASE = 'http://localhost:8000';
 
     let conversationId = localStorage.getItem('conversationId');
     if (!conversationId) {
@@ -202,7 +191,6 @@
 
     async function sendMessage(ev) {
       ev.preventDefault();
-      const apiBase = localStorage.getItem('apiBase') || DEFAULT_BASE;
       const msg = inputEl.value.trim();
       if (!msg) return;
 
@@ -216,7 +204,7 @@
       extra.className = 'text-xs text-gray-600 mt-2 space-y-2';
       body.appendChild(extra);
 
-      const res = await fetch(`${apiBase}/chat/stream`, {
+      const res = await fetch(`${API_BASE}/chat/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: conversationId, message: msg })
