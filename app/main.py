@@ -4,6 +4,7 @@ from fastapi.responses import StreamingResponse, FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Dict, Any
 import json, uuid, os
+import re
 import pandas as pd
 from urllib.parse import quote_plus
 from .schemas import ChatRequest, ChatChunk, ChatResponse, IndexRequest, ConversationHistory, Message
@@ -248,6 +249,14 @@ def chat_stream(req: ChatRequest):
                 buffer.append(delta)
                 yield f"data: {json.dumps({'type':'token','content': delta})}\n\n"
             final = "".join(buffer)
+            
+            # 후처리 훅 적용
+            final = _strip_persona(final)
+            final = _dedup_followups(final)
+            # citations 주입/치환
+            cits = _build_citations(ctx)
+            final = re.sub(r"<citations>.*?</citations>", cits, final, flags=re.S) if "<citations>" in final else (final + "\n\n" + cits)
+            
             if final.strip():
                 memory.add(conv_id, "assistant", final[:1500])
             yield "event: done\n"
@@ -291,6 +300,47 @@ def chat_stream(req: ChatRequest):
                 yield "data: {}\n\n"
 
     return StreamingResponse(sse_gen(), media_type="text/event-stream")
+
+# 후처리 함수들
+def _strip_persona(text: str) -> str:
+    """페르소나 제거 (상담사입니다... 안녕하세요... 도입부 컷)"""
+    lines = text.splitlines()
+    out, started = [], False
+    persona = re.compile(r"(상담사입니다|전문가입니다|도와드리겠습니다)", re.I)
+    for ln in lines:
+        if not started and (ln.strip().startswith("안녕하세요") or persona.search(ln)):
+            continue
+        started = True
+        out.append(ln)
+    return "\n".join(out).strip()
+
+def _build_citations(ctx):
+    """실제 인용 강제: 리트리버 상위 문서의 (title, url)로 citations 채움"""
+    items, seen = [], set()
+    for d in ctx[:3]:
+        t, u = (d.get("title") or "").strip(), (d.get("url") or "").strip()
+        if u and (t,u) not in seen:
+            items.append(f"- ({t}) ({u})")
+            seen.add((t,u))
+    return "<citations>\n" + "\n".join(items) + "\n</citations>" if items else "<citations>\n</citations>"
+
+def _dedup_followups(text: str) -> str:
+    """followups 2개로 정리·중복 제거"""
+    m = re.search(r"<followups>(.*?)</followups>", text, flags=re.S)
+    if not m:
+        return text
+    uniq, out = set(), []
+    for ln in m.group(1).splitlines():
+        ln = ln.strip()
+        if ln.startswith("-"):
+            key = ln[1:].strip().lower()
+            if key and key not in uniq:
+                uniq.add(key)
+                out.append(ln)
+        if len(out) >= 2:
+            break
+    newblk = "<followups>\n" + ("\n".join(out) if out else "- 추가로 궁금한 점이 있으신가요?") + "\n</followups>"
+    return text[:m.start()] + newblk + text[m.end():]
 
 @app.get("/debug/llm_status")
 def debug_llm_status():
