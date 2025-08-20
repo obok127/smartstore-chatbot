@@ -23,7 +23,7 @@ class GeminiLLM:
                 messages[0]["content"],
                 stream=True,
                 generation_config=genai.types.GenerationConfig(
-                    temperature=0.2,
+                    temperature=0.3,
                     top_p=0.9,
                     max_output_tokens=700,
                 )

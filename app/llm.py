@@ -29,7 +29,7 @@ def build_prompt(context: List[Dict[str, Any]], history_text: str, user_msg: str
     ctx_items = []
     for i, d in enumerate(context, start=1):
         raw = d.get("text","") or ""
-        snippet = _clean_ctx(_strip_passage_prefix(raw))[:900]  # 길이 축소
+        snippet = _clean_ctx(_strip_passage_prefix(raw))[:800]  # 길이 축소
         ctx_items.append({
             "index": i,
             "title": d.get("title",""),
@@ -64,7 +64,7 @@ class LLM:
             with self.client.chat.completions.stream(
                 model=self.model,
                 messages=messages,
-                temperature=0.2,
+                temperature=0.3,
                 top_p=0.9,
                 max_tokens=700
             ) as stream:

@@ -339,7 +339,7 @@ def _dedup_followups(text: str) -> str:
                 out.append(ln)
         if len(out) >= 2:
             break
-    newblk = "<followups>\n" + ("\n".join(out) if out else "- 추가로 궁금한 점이 있으신가요?") + "\n</followups>"
+    newblk = "<followups>\n" + ("\n".join(out) if out else "- 다른 점도 도와드릴까요?") + "\n</followups>"
     return text[:m.start()] + newblk + text[m.end():]
 
 @app.get("/debug/llm_status")

@@ -117,7 +117,7 @@
       const p = document.createElement('p');
       p.className = 'leading-relaxed break-words';
       if (role === 'user') p.classList.add('text-right');
-      p.innerHTML = html || '';
+      p.innerHTML = renderMarkdown(html || ''); // 마크다운 렌더링 적용
       body.appendChild(p);
 
       // ✅ 사용자일 때: 버블을 먼저, 아바타를 나중에 추가 → row-reverse에서 버블이 우측 끝에 고정
@@ -140,6 +140,17 @@
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
+    }
+
+    function renderMarkdown(text) {
+      // 마크다운을 HTML로 변환
+      return text
+        // 볼드체: **text** -> <strong>text</strong>
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // 이탤릭: *text* -> <em>text</em>
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        // 줄바꿈: \n -> <br>
+        .replace(/\n/g, '<br>');
     }
 
     function extractBlocks(text) {
@@ -238,7 +249,7 @@
                 const payload = JSON.parse(line.slice(6));
                 if (payload && payload.type === 'token') {
                   fullText += payload.content || '';
-                  p.textContent = fullText; // Live update
+                  p.innerHTML = renderMarkdown(fullText); // 마크다운 렌더링 적용
                   chatEl.scrollTop = chatEl.scrollHeight;
                 }
               } catch {}
@@ -249,7 +260,7 @@
 
       // Post-process blocks: followups & citations
       const { main, followups, citations } = extractBlocks(fullText);
-      p.textContent = main || fullText; // strip custom blocks from final text
+      p.innerHTML = renderMarkdown(main || fullText); // 마크다운 렌더링 유지
 
       // Render followups
       if (followups.length) {
