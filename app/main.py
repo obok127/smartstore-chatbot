@@ -48,9 +48,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-retriever = Retriever()
-memory = ConversationMemory()
-llm = LLM()
+# ---- lazy loader (startup non-blocking) ----
+class _Lazy:
+    def __init__(self, factory):
+        self._factory = factory
+        self._obj = None
+    def __getattr__(self, name):
+        if self._obj is None:
+            self._obj = self._factory()
+        return getattr(self._obj, name)
+
+retriever = _Lazy(Retriever)
+memory    = _Lazy(ConversationMemory)
+llm       = _Lazy(LLM)
+# --------------------------------------------
 
 
 def make_help_links(q: str):
