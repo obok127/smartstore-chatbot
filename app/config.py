@@ -1,7 +1,14 @@
+import os
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=os.getenv("ENV_FILE", os.path.join(os.getcwd(), ".env")),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    
     # Keys & models
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
     openai_chat_model: str = Field(default="gpt-4o-mini", alias="OPENAI_CHAT_MODEL")
@@ -25,7 +32,15 @@ class Settings(BaseSettings):
 
     # Hybrid fuse weight (dense score contribution multiplier)
     hybrid_dense_weight: float = Field(default=0.2, alias="HYBRID_DENSE_WEIGHT")
-
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    
+    # 차원 불일치 방지
+    expected_embed_dim_env: str | None = os.getenv("EXPECTED_EMBED_DIM", "").strip() or None
+    
+    @property
+    def expected_embed_dim(self) -> int | None:
+        try:
+            return int(self.expected_embed_dim_env) if self.expected_embed_dim_env else None
+        except Exception:
+            return None
 
 settings = Settings()

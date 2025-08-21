@@ -384,6 +384,68 @@ def debug_llm_status():
             }
         }
 
+@app.get("/debug/embedding_status")
+def debug_embedding_status():
+    """임베딩 모델 상태 확인"""
+    try:
+        from .embeddings import LocalEmbedder
+        embedder = LocalEmbedder()
+        test_embedding = embedder.embed_one("test")
+        
+        return {
+            "embed_model": embedder.model_name,
+            "embed_dim": len(test_embedding),
+            "index_dim": 1024,  # ChromaDB 컬렉션에서 확인한 차원
+            "dimension_match": len(test_embedding) == 1024,
+            "config_model": settings.local_embed_model,
+            "config_device": settings.local_embed_device
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/debug/env")
+def debug_env():
+    """환경 변수 및 작업 경로 확인"""
+    import os
+    keys = ["USE_LOCAL_EMBEDDINGS","LOCAL_EMBED_MODEL","LOCAL_EMBED_DEVICE",
+            "EXPECTED_EMBED_DIM","CHROMA_PATH","SQLITE_PATH","ENV_FILE"]
+    return {
+        "cwd": os.getcwd(),
+        "env": {k: os.getenv(k) for k in keys}
+    }
+
+@app.get("/debug/model_info")
+def debug_model_info():
+    """실제 로드되는 모델 정보 확인"""
+    try:
+        from .embeddings import LocalEmbedder
+        embedder = LocalEmbedder()
+        test_embedding = embedder.embed_one("test")
+        
+        return {
+            "model_name": embedder.model_name,
+            "model_dim": embedder.dim,
+            "test_embedding_shape": len(test_embedding),
+            "config_model": settings.local_embed_model,
+            "config_device": settings.local_embed_device,
+            "model_loaded_successfully": True
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "config_model": settings.local_embed_model,
+            "config_device": settings.local_embed_device,
+            "model_loaded_successfully": False
+        }
+
+@app.post("/debug/rebuild_dense")
+def debug_rebuild_dense(batch_size: int = 256):
+    try:
+        out = retriever.rebuild_dense_from_docmap(batch_size=batch_size)
+        return {"status": "ok", **out}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
 @app.get("/debug/index_status")
 def debug_index_status(q: str = "상품 등록 절차", k: int = 3):
     try:

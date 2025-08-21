@@ -10,6 +10,9 @@ from pathlib import Path
 from .embeddings import LocalEmbedder
 from .config import settings
 from tqdm import tqdm
+import logging
+
+log = logging.getLogger(__name__)
 
 # Optional reranker (FlagEmbedding)
 try:
@@ -29,14 +32,42 @@ class Retriever:
             path=self.chroma_path,
             settings=ChromaSettings(allow_reset=False)
         )
-        self.collection = self.client.get_or_create_collection(
-            name="smartstore_faq",
-            metadata={"hnsw:space": "cosine"}
-        )
-
+        
         # 로컬 임베딩만 사용
         self.embedder = LocalEmbedder(model_name=settings.local_embed_model, device=settings.local_embed_device)
-        self.dense_ok = True
+        
+        # ChromaDB 임베딩 함수 정의
+        class ChromaEmbeddingFunction:
+            def __init__(self, embedder):
+                self.embedder = embedder
+            
+            def __call__(self, input):
+                return self.embedder.embed(input)
+            
+            def name(self):
+                return "custom_embedding_function"
+        
+        self.collection = self.client.get_or_create_collection(
+            name="smartstore_faq",
+            embedding_function=ChromaEmbeddingFunction(self.embedder),
+            metadata={"hnsw:space": "cosine"}
+        )
+        self.embed_dim = self.embedder.dim
+        
+        # 차원 불일치 Fail Fast 가드
+        try:
+            self.index_dim = self._detect_index_dim()  # 컬렉션에서 1개 꺼내 길이 확인
+            expected = settings.expected_embed_dim or self.embed_dim
+            
+            log.info(f"[INDEX] index_dim={self.index_dim}, embed_dim={self.embed_dim}, expected_dim={expected}")
+            
+            if self.index_dim and expected and self.index_dim != expected:
+                raise ValueError(f"[DIM MISMATCH] index:{self.index_dim} != expected:{expected} — reindex or fix embedder")
+            
+            self.dense_ok = True
+        except Exception as e:
+            log.error(f"[INDEX] 차원 검증 실패: {e}")
+            self.dense_ok = False
 
         # Optional reranker
         self.reranker = None
@@ -55,8 +86,22 @@ class Retriever:
             self.client.delete_collection("smartstore_faq")
         except Exception:
             pass
+        
+        # ChromaDB 임베딩 함수 정의
+        class ChromaEmbeddingFunction:
+            def __init__(self, embedder):
+                self.embedder = embedder
+            
+            def __call__(self, input):
+                return self.embedder.embed(input)
+            
+            def name(self):
+                return "custom_embedding_function"
+        
         self.collection = self.client.get_or_create_collection(
-            name="smartstore_faq", metadata={"hnsw:space":"cosine"}
+            name="smartstore_faq", 
+            embedding_function=ChromaEmbeddingFunction(self.embedder),
+            metadata={"hnsw:space":"cosine"}
         )
         # 로컬 인덱스 리셋
         for p in [Path(self.chroma_path)/BM25_PKL, Path(self.chroma_path)/DOCS_PKL]:
@@ -124,6 +169,17 @@ class Retriever:
                 return d["bm25"], d["lookup"]
         return None, None
 
+    def _detect_index_dim(self) -> int | None:
+        """인덱스 차원 감지 - 실제 저장된 벡터에서 읽기"""
+        try:
+            if self.collection.count() > 0:
+                g = self.collection.get(limit=1, include=["embeddings"])
+                if g and g.get("embeddings") and g["embeddings"][0] is not None:
+                    return len(g["embeddings"][0])
+        except Exception as e:
+            log.warning(f"[INDEX] 차원 감지 실패: {e}")
+        return None
+
     def _load_docs(self) -> Dict[str, Any]:
         path = Path(self.chroma_path) / DOCS_PKL
         if path.exists():
@@ -141,10 +197,10 @@ class Retriever:
         # 1) Dense retrieval (Chroma)
         if self.dense_ok:
             try:
-                # BGE 권장: query 접두어
-                query_text = "query: " + query
+                # BGE 권장: query 접두어 + 직접 임베딩 사용
+                qvec = self.embedder.embed_one("query: " + query)
                 dense_results = self.collection.query(
-                    query_texts=[query_text],
+                    query_embeddings=[qvec],
                     n_results=candidate_k,
                     include=["metadatas", "documents", "distances"]
                 )
@@ -217,6 +273,54 @@ class Retriever:
                 })
 
         return results
+
+    def rebuild_dense_from_docmap(self, batch_size: int = 256) -> Dict[str, Any]:
+        if not self._doc_map:
+            raise ValueError("doc_map 비어 있음: BM25/문서맵이 존재하는지 확인하세요.")
+
+        # 이미 인덱싱된 문서 ID 확인
+        existing_ids = set()
+        try:
+            if self.collection.count() > 0:
+                existing = self.collection.get(limit=10000, include=[])
+                if existing and existing.get("ids"):
+                    existing_ids = set(existing["ids"])
+        except Exception as e:
+            print(f"[dense-rebuild] 기존 ID 확인 실패: {e}")
+
+        ids, texts, metas = [], [], []
+        total, done = len(self._doc_map), len(existing_ids)
+        remaining = total - done
+
+        print(f"[dense-rebuild] 기존: {done}개, 남은: {remaining}개")
+
+        def flush():
+            nonlocal ids, texts, metas, done
+            if not ids:
+                return
+            embs = self.embedder.embed(texts)  # 1024차원 보장
+            self.collection.upsert(ids=ids, documents=texts, metadatas=metas, embeddings=embs)
+            done += len(ids)
+            print(f"[dense-rebuild] upsert {done}/{total} (추가: {len(ids)}개)")
+            ids, texts, metas = [], [], []
+
+        for doc_id, d in self._doc_map.items():
+            if doc_id in existing_ids:
+                continue  # 이미 인덱싱된 문서는 건너뛰기
+            
+            ids.append(doc_id)
+            texts.append("passage: " + (d.get("text") or ""))
+            metas.append({"title": d.get("title",""), "url": d.get("url",""), "category": d.get("category","")})
+            if len(ids) >= batch_size:
+                flush()
+        flush()
+
+        return {
+            "chroma_count": self.collection.count(),
+            "doc_map_size": len(self._doc_map),
+            "existing_count": len(existing_ids),
+            "newly_added": self.collection.count() - len(existing_ids)
+        }
 
     @staticmethod
     def _tokenize(text: str) -> List[str]:
