@@ -324,6 +324,33 @@ def _build_citations(ctx):
             seen.add((t,u))
     return "<citations>\n" + "\n".join(items) + "\n</citations>" if items else "<citations>\n</citations>"
 
+def parse_answer_v3(text: str):
+    """새로운 형식 파서: 라벨 없는 불릿 + 참고 링크"""
+    pattern = re.compile(r"""
+    ^(?P<summary>[^\n]+)\n+                             # 1) 첫 줄 요약
+    (?P<tips>(?:-\s.*\n?)+)?                            # 2) 라벨 없는 불릿 0~N
+    \n?\*\*(?:참고|근거)\*\*\s*\n                       # 3) 참고/근거 라벨(고정)
+    (?P<refs>(?:-\s.*\n?)+)?                            # 4) 참고 링크 불릿 0~N
+    \n?<followups>\s*\n                                 # 5) followups 시작
+    (?P<fups>(?:-\s.*\n?)+)                             # 6) 후속질문 1~N
+    \s*</followups>\s*$                                 # 7) 종료
+    """, re.DOTALL | re.MULTILINE | re.UNICODE | re.VERBOSE)
+    
+    m = pattern.search(text.strip())
+    if not m:
+        return None
+    
+    tips = [l[2:].strip() for l in (m.group("tips") or "").splitlines() if l.strip().startswith("-")][:3]
+    refs = [l[2:].strip() for l in (m.group("refs") or "").splitlines() if l.strip().startswith("-")][:2]
+    fups = [l[2:].strip() for l in (m.group("fups") or "").splitlines() if l.strip().startswith("-")][:2]
+    
+    return {
+        "summary": m.group("summary").strip(),
+        "tips": tips,
+        "refs": refs,
+        "followups": fups,
+    }
+
 def _dedup_followups(text: str) -> str:
     """followups 2개로 정리·중복 제거"""
     m = re.search(r"<followups>(.*?)</followups>", text, flags=re.S)
@@ -412,6 +439,31 @@ def debug_env():
     return {
         "cwd": os.getcwd(),
         "env": {k: os.getenv(k) for k in keys}
+    }
+
+@app.get("/debug/parse_test")
+def debug_parse_test():
+    """새로운 파서 테스트"""
+    test_text = """만 14세 이상이면 스마트스토어를 개설할 수 있어요.
+
+- 만 14세~19세는 법정대리인 동의와 서류 제출이 필요해요
+- 만 19세 이상은 일반 개설이 가능해요
+- 개인사업자 등록이 필요할 수 있어요
+
+**참고**
+- (스마트스토어 가입 절차) (https://help.sell.smartstore.naver.com)
+- (개인사업자 등록 안내) (https://help.sell.smartstore.naver.com)
+
+<followups>
+- 개인사업자 등록 방법이 궁금해요
+- 입점 심사 기간이 얼마나 걸리나요?
+</followups>"""
+    
+    parsed = parse_answer_v3(test_text)
+    return {
+        "original": test_text,
+        "parsed": parsed,
+        "success": parsed is not None
     }
 
 @app.get("/debug/model_info")

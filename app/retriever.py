@@ -235,10 +235,10 @@ class Retriever:
                 # 제목 기반 fuzzy search
                 titles = [(doc_id, doc["title"]) for doc_id, doc in self._doc_map.items()]
                 matches = process.extract(query, [t[1] for t in titles], limit=candidate_k, scorer=fuzz.partial_ratio)
-                for match, score in matches:
+                for choice, score, idx in matches:  # ✅ 올바른 언패킹
                     if score > 50:  # 50% 이상 매치
-                        doc_id = titles[match[2]][0]  # match[2]는 원본 인덱스
-                        fused[doc_id] = score / 100.0
+                        doc_id = titles[idx][0]
+                        fused[doc_id] = max(fused.get(doc_id, 0.0), score / 100.0)
             except Exception as e:
                 print(f"[retrieve] Fuzzy 검색 실패: {e}")
 
