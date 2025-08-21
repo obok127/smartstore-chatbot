@@ -1,4 +1,4 @@
-# 🛍️ 네이버 스마트스토어 FAQ RAG 챗봇
+# 네이버 스마트스토어 FAQ RAG 챗봇
 
 > **2717개 FAQ 데이터 기반의 지능형 챗봇**  
 > FastAPI + RAG + 스트리밍으로 구현된 스마트스토어 전문 상담사
@@ -8,51 +8,51 @@
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Local-orange.svg)](https://chromadb.ai)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 📋 목차
+## 목차
 
-- [🎯 프로젝트 개요](#-프로젝트-개요)
-- [🚀 주요 기능](#-주요-기능)
-- [🏗️ 기술 스택](#️-기술-스택)
-- [📁 프로젝트 구조](#-프로젝트-구조)
-- [⚙️ 설치 및 실행](#️-설치-및-실행)
-- [🔧 API 사용법](#-api-사용법)
-- [🎭 데모 시나리오](#-데모-시나리오)
-- [📊 성능 최적화](#-성능-최적화)
-- [🔍 문제 해결](#-문제-해결)
-- [🤝 기여하기](#-기여하기)
+- [프로젝트 개요](#프로젝트-개요)
+- [주요 기능](#주요-기능)
+- [기술 스택](#기술-스택)
+- [프로젝트 구조](#프로젝트-구조)
+- [설치 및 실행](#설치-및-실행)
+- [API 사용법](#api-사용법)
+- [데모 시나리오](#데모-시나리오)
+- [성능 최적화](#성능-최적화)
+- [문제 해결](#문제-해결)
+- [기여하기](#기여하기)
 
-## 🎯 프로젝트 개요
+## 프로젝트 개요
 
 네이버 스마트스토어의 **2717개 FAQ 데이터**를 기반으로 한 지능형 챗봇입니다. RAG(Retrieval-Augmented Generation) 기술을 활용하여 정확하고 맥락에 맞는 답변을 제공하며, 실시간 스트리밍으로 자연스러운 대화 경험을 제공합니다.
 
-### 📚 참고 데이터
+### 참고 데이터
 - **출처**: [네이버 스마트스토어 도움말](https://help.sell.smartstore.naver.com/index.help)
 - **데이터**: 2717개 한글 FAQ (final_result.pkl)
 - **범위**: 가입/등록, 상품관리, 정산관리, 배송/환불 등 전 영역
 
-## 🚀 주요 기능
+## 주요 기능
 
-### 💬 지능형 대화
+### 지능형 대화
 - **맥락 인식**: 이전 대화 기록을 기반으로 연속성 있는 답변
 - **후속 질문 제안**: 관련된 추가 질문들을 자동 제안
 - **실시간 스트리밍**: 자연스러운 타이핑 효과로 답변 전달
 
-### 🔍 정확한 검색
+### 정확한 검색
 - **하이브리드 검색**: ChromaDB(Dense) + BM25(Sparse) 융합
 - **키워드 부스팅**: 제목 매칭 시 가중치 부여
 - **관련성 필터링**: 질문과 답변의 관련성 자동 판단
 
-### 🛡️ 도메인 가드
+### 도메인 가드
 - **오프토픽 필터링**: 스마트스토어 관련 질문만 답변
 - **키워드 기반 분류**: 1000+ 스마트스토어 관련 키워드
 - **점수 기반 판단**: 검색 결과 점수로 의도 분류
 
-### 📝 대화 관리
+### 대화 관리
 - **대화 기록 저장**: SQLite 기반 영구 저장
 - **세션 관리**: conversation_id 기반 대화 분리
 - **메모리 최적화**: 최근 12개 대화만 유지
 
-## 🏗️ 기술 스택
+## 기술 스택
 
 ### Backend
 - **FastAPI**: 고성능 웹 프레임워크
@@ -76,112 +76,164 @@
 - **Docker**: 컨테이너화 (선택사항)
 - **Git**: 버전 관리
 
-## 📁 프로젝트 구조
+## 프로젝트 구조
 
 ```
 smartstore-faq-rag/
-├── 📁 app/                          # 메인 애플리케이션
-│   ├── 🐍 main.py                   # FastAPI 앱 및 엔드포인트
-│   ├── 🐍 config.py                 # 환경 설정 관리
-│   ├── 🐍 llm.py                    # LLM 통합 (OpenAI/Gemini)
-│   ├── 🐍 llm_gemini.py             # Gemini API 구현
-│   ├── 🐍 retriever.py              # 하이브리드 검색 엔진
-│   ├── 🐍 embeddings.py             # 임베딩 모델 관리
-│   ├── 🐍 memory.py                 # 대화 기록 관리
-│   ├── 🐍 guard.py                  # 도메인 가드 및 의도 분류
-│   ├── 🐍 prompts.py                # 프롬프트 템플릿 관리
-│   └── 🐍 schemas.py                # Pydantic 스키마 정의
-├── 📁 data/                         # 데이터 파일
-│   ├── 📄 final_result.pkl          # 2717개 FAQ 데이터
-│   ├── 📁 chroma/                   # ChromaDB 벡터 저장소
-│   └── 📄 memory.db                 # 대화 기록 SQLite DB
-├── 📁 scripts/                      # 유틸리티 스크립트
-│   └── 🐍 build_index.py            # 인덱스 구축 스크립트
-├── 📁 demos/                        # 데모 시나리오
-│   ├── 📄 scenario_A.txt            # 신규 판매자 가입 시나리오
-│   └── 📄 scenario_B.txt            # 정산 및 수수료 시나리오
-├── 🌐 smart_store_faq_chat_frontend_index.html  # 웹 인터페이스
-├── 📄 requirements.txt              # Python 의존성
-├── 📄 .env                          # 환경 변수 (예시)
-├── 📄 .gitignore                    # Git 무시 파일
-└── 📄 README.md                     # 프로젝트 문서
+├── app/                          # 메인 애플리케이션
+│   ├── main.py                   # FastAPI 앱 및 엔드포인트
+│   ├── config.py                 # 환경 설정 관리
+│   ├── llm.py                    # LLM 통합 (OpenAI/Gemini)
+│   ├── llm_gemini.py             # Gemini API 구현
+│   ├── retriever.py              # 하이브리드 검색 엔진
+│   ├── embeddings.py             # 임베딩 모델 관리
+│   ├── memory.py                 # 대화 기록 관리
+│   ├── guard.py                  # 도메인 가드 및 의도 분류
+│   ├── prompts.py                # 프롬프트 템플릿 관리
+│   └── schemas.py                # Pydantic 스키마 정의
+├── data/                         # 데이터 파일
+│   ├── final_result.pkl          # 2717개 FAQ 데이터
+│   ├── chroma/                   # ChromaDB 벡터 저장소
+│   └── memory.db                 # 대화 기록 SQLite DB
+├── scripts/                      # 유틸리티 스크립트
+│   └── build_index.py            # 인덱스 구축 스크립트
+├── demos/                        # 데모 시나리오
+│   ├── scenario_A.txt            # 신규 판매자 가입 시나리오
+│   └── scenario_B.txt            # 정산 및 수수료 시나리오
+├── smart_store_faq_chat_frontend_index.html  # 웹 인터페이스
+├── requirements.txt              # Python 의존성
+├── .env                          # 환경 변수 (예시)
+├── .gitignore                    # Git 무시 파일
+└── README.md                     # 프로젝트 문서
 ```
 
-## ⚙️ 설치 및 실행
+## 설치 및 실행
 
-### 1. 저장소 클론
+### Docker로 실행하는 방법 (권장)
+
 ```bash
-git clone <repository-url>
-cd smartstore-faq-rag
-```
+# 1. 저장소 클론
+git clone https://github.com/obok127/smartstore-chatbot.git
+cd smartstore-chatbot
 
-### 2. 가상환경 설정
-```bash
-# Python 3.8+ 필요
-python -m venv .venv
+# 2. .env 파일 생성
+cat > .env << 'EOF'
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=실제_API_키
+LOCAL_EMBED_MODEL=BAAI/bge-m3
+LOCAL_EMBED_DEVICE=cpu
+TOP_K=6
+SCORE_THRESHOLD=0.18
+HYBRID_DENSE_WEIGHT=0.2
+ENABLE_RERANKER=true
+TOKENIZERS_PARALLELISM=false
+RERANK_TOP_K=20
+EOF
 
-# 가상환경 활성화
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
-```
+# 3. Docker 이미지 빌드
+docker build -t smartstore-chatbot .
 
-### 3. 의존성 설치
-```bash
-pip install -r requirements.txt
-```
+# 4. 컨테이너 실행
+docker run --rm -p 8000:8000 --env-file .env smartstore-chatbot
 
-### 4. 환경 변수 설정
-```bash
-# .env 파일 생성
-cp .env.example .env
-
-# .env 파일 편집
-nano .env
-```
-
-**필수 환경 변수:**
-```env
-# LLM 설정
-LLM_PROVIDER=gemini                    # gemini 또는 openai
-GEMINI_API_KEY=your_gemini_api_key    # Gemini API 키
-OPENAI_API_KEY=your_openai_api_key    # OpenAI API 키 (선택사항)
-
-# 검색 설정
-SCORE_THRESHOLD=0.14                   # 의도 분류 임계값
-TOP_K=5                               # 검색 결과 수
-RERANK_TOP_K=3                        # 재순위화 결과 수
-
-# 서버 설정
-HOST=127.0.0.1
-PORT=8000
-```
-
-### 5. 서버 실행
-```bash
-# 개발 모드 (자동 재시작)
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-
-# 프로덕션 모드
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-### 6. 인덱스 구축
-```bash
-# API를 통한 인덱스 구축
-curl -X POST "http://localhost:8000/index" \
-  -H "Content-Type: application/json" \
+# 5. 데이터 인덱싱 (새 터미널에서)
+curl -X POST 'http://127.0.0.1:8000/index' \
+  -H 'Content-Type: application/json' \
   -d '{"pkl_path":"data/final_result.pkl","reset":true}'
-
-# 또는 스크립트 사용
-python scripts/build_index.py
 ```
 
-### 7. 웹 인터페이스 접속
+### 로컬 가상환경으로 실행하는 방법
+
+#### macOS에서 실행 (faiss-cpu 제외)
+```bash
+# 1. 저장소 클론
+git clone https://github.com/obok127/smartstore-chatbot.git
+cd smartstore-chatbot
+
+# 2. 가상환경 생성 및 활성화
+python -m venv .venv
+source .venv/bin/activate
+
+# 3. macOS용 requirements 설치 (faiss-cpu 제외)
+pip install fastapi uvicorn openai chromadb pandas rank-bm25 rapidfuzz pydantic pydantic-settings python-dotenv tiktoken huggingface-hub transformers sentence-transformers FlagEmbedding google-generativeai
+
+# 4. .env 파일 생성
+cat > .env << 'EOF'
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=실제_API_키
+LOCAL_EMBED_MODEL=BAAI/bge-m3
+LOCAL_EMBED_DEVICE=cpu
+TOP_K=6
+SCORE_THRESHOLD=0.18
+HYBRID_DENSE_WEIGHT=0.2
+ENABLE_RERANKER=true
+TOKENIZERS_PARALLELISM=false
+RERANK_TOP_K=20
+EOF
+
+# 5. 서버 실행 (macOS 호환성 옵션)
+export UVICORN_NO_UVLOOP=1 UVICORN_NO_HTTPTOOLS=1
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level warning
+
+# 6. 데이터 인덱싱 (새 터미널에서)
+curl -X POST 'http://127.0.0.1:8000/index' \
+  -H 'Content-Type: application/json' \
+  -d '{"pkl_path":"data/final_result.pkl","reset":true}'
+```
+
+#### Windows/Linux에서 실행
+```bash
+# 1. 저장소 클론
+git clone https://github.com/obok127/smartstore-chatbot.git
+cd smartstore-chatbot
+
+# 2. 가상환경 생성 및 활성화
+python -m venv .venv
+source .venv/bin/activate  # Linux
+# 또는 .venv\Scripts\activate  # Windows
+
+# 3. 의존성 설치
+pip install -r requirements.txt
+
+# 4. .env 파일 생성 (위와 동일)
+cat > .env << 'EOF'
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=실제_API_키
+LOCAL_EMBED_MODEL=BAAI/bge-m3
+LOCAL_EMBED_DEVICE=cpu
+TOP_K=6
+SCORE_THRESHOLD=0.18
+HYBRID_DENSE_WEIGHT=0.2
+ENABLE_RERANKER=true
+TOKENIZERS_PARALLELISM=false
+RERANK_TOP_K=20
+EOF
+
+# 5. 서버 실행
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 6. 데이터 인덱싱
+curl -X POST 'http://127.0.0.1:8000/index' \
+  -H 'Content-Type: application/json' \
+  -d '{"pkl_path":"data/final_result.pkl","reset":true}'
+```
+
+### 예상 시간
+- **Docker 첫 빌드**: 5-10분 (의존성 다운로드)
+- **Docker 재실행**: 1-2분
+- **로컬 첫 실행**: 3-5분 (모델 다운로드)
+- **로컬 재실행**: 30초-1분
+- **인덱싱**: 2-3분 (FAQ 데이터 크기에 따라)
+
+### 웹 인터페이스 접속
 브라우저에서 `http://localhost:8000` 접속
 
-## 🔧 API 사용법
+### macOS 사용자 주의사항
+- `faiss-cpu` 패키지는 ARM64 아키텍처에서 빌드 문제가 발생할 수 있습니다
+- 로컬 실행 시 `faiss-cpu`를 제외하고 설치하면 안정적으로 실행됩니다
+- Docker 사용 시에는 자동으로 처리됩니다
+
+## API 사용법
 
 ### 기본 엔드포인트
 

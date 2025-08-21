@@ -244,10 +244,79 @@ def chat_stream(req: ChatRequest):
 
     def sse_gen():
         buffer = []
+        tool_called = False
         try:
-            for delta in llm.stream_answer(messages):
-                buffer.append(delta)
-                yield f"data: {json.dumps({'type':'token','content': delta})}\n\n"
+            # Gemini 모델에서 직접 스트리밍 처리
+            from .llm_gemini import handle_tool_call
+            
+            # Gemini API 직접 호출
+            import google.generativeai as genai
+            from .config import settings
+            
+            genai.configure(api_key=settings.gemini_api_key)
+            model = genai.GenerativeModel(
+                'gemini-1.5-flash',
+                tools=[{
+                    "function_declarations": [{
+                        "name": "open_help_search",
+                        "description": "스마트스토어 도움말(FAQ)에서 keyword로 검색하는 링크를 생성합니다.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "keyword": {"type": "string", "description": "검색 키워드 (예: '상품등록')"},
+                                "categoryNo": {"type": "integer", "description": "도움말 카테고리 번호 (모르면 0)"},
+                            },
+                            "required": ["keyword"],
+                        },
+                    }]
+                }],
+                tool_config={"function_calling_config": {"mode": "AUTO"}}
+            )
+            
+            # 메시지 변환
+            gemini_messages = []
+            for msg in messages:
+                if msg["role"] == "system":
+                    gemini_messages.append({"role": "user", "parts": msg["content"]})
+                else:
+                    gemini_messages.append({"role": msg["role"], "parts": msg["content"]})
+            
+            response = model.generate_content(gemini_messages, stream=True)
+            
+            for chunk in response:
+                # 툴콜 감지
+                try:
+                    candidates = getattr(chunk, "candidates", [])
+                    for candidate in candidates:
+                        content = getattr(candidate, "content", None)
+                        if content:
+                            parts = getattr(content, "parts", [])
+                            for part in parts:
+                                function_call = getattr(part, "function_call", None)
+                                if function_call and not tool_called:
+                                    tool_name = function_call.name
+                                    tool_args = dict(function_call.args or {})
+                                    result = handle_tool_call(tool_name, tool_args)
+                                    if result:
+                                        tool_called = True
+                                        yield f"event: tool\n"
+                                        yield f"data: {json.dumps(result, ensure_ascii=False)}\n\n"
+                                        break
+                            if tool_called:
+                                break
+                        if tool_called:
+                            break
+                    if tool_called:
+                        continue
+                except Exception:
+                    pass
+                
+                # 일반 텍스트 청크
+                text = getattr(chunk, "text", "")
+                if text:
+                    buffer.append(text)
+                    yield f"data: {json.dumps({'type':'token','content': text})}\n\n"
+            
             final = "".join(buffer)
             
             # 후처리 훅 적용
@@ -464,6 +533,33 @@ def debug_parse_test():
         "original": test_text,
         "parsed": parsed,
         "success": parsed is not None
+    }
+
+@app.get("/debug/tool_test")
+def debug_tool_test():
+    """툴 호출 테스트"""
+    from .utils.help_links import build_help_search_url
+    from .llm_gemini import handle_tool_call
+    
+    test_cases = [
+        {"keyword": "상품등록", "categoryNo": 0},
+        {"keyword": "빠른정산", "categoryNo": 0},
+        {"keyword": "주문취소", "categoryNo": 0},
+    ]
+    
+    results = []
+    for case in test_cases:
+        url = build_help_search_url(case["keyword"], case["categoryNo"])
+        tool_result = handle_tool_call("open_help_search", case)
+        results.append({
+            "input": case,
+            "url": url,
+            "tool_result": tool_result
+        })
+    
+    return {
+        "test_cases": results,
+        "base_url": "https://help.sell.smartstore.naver.com/faq/search.help"
     }
 
 @app.get("/debug/model_info")

@@ -214,6 +214,9 @@
       const extra = document.createElement('div');
       extra.className = 'text-xs text-gray-600 mt-2 space-y-2';
       body.appendChild(extra);
+      
+      // 툴 이벤트를 위한 변수
+      let toolData = null;
 
       const res = await fetch(`${API_BASE}/chat/stream`, {
         method: 'POST',
@@ -253,6 +256,14 @@
                   chatEl.scrollTop = chatEl.scrollHeight;
                 }
               } catch {}
+            } else if (line.startsWith('event: tool')) {
+              // 툴 이벤트 처리
+              const nextLine = lines[lines.indexOf(line) + 1];
+              if (nextLine && nextLine.startsWith('data: ')) {
+                try {
+                  toolData = JSON.parse(nextLine.slice(6));
+                } catch {}
+              }
             }
           }
         }
@@ -277,6 +288,28 @@
           wrap.appendChild(btn);
         }
         extra.appendChild(wrap);
+      }
+
+      // Render tool button (도움말 검색)
+      if (toolData && toolData.tool === 'open_help_search') {
+        const toolDiv = document.createElement('div');
+        toolDiv.className = 'mt-4 p-3 border rounded bg-gray-50 flex items-center gap-3';
+        
+        const link = document.createElement('a');
+        link.href = toolData.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.className = 'px-3 py-1 border rounded bg-blue-500 text-white hover:bg-blue-600';
+        link.textContent = `🔎 도움말에서 '${toolData.keyword}' 검색`;
+        link.title = `도움말에서 '${toolData.keyword}' 검색`;
+        
+        const category = document.createElement('span');
+        category.className = 'text-xs opacity-70';
+        category.textContent = `카테고리No: ${toolData.categoryNo}`;
+        
+        toolDiv.appendChild(link);
+        toolDiv.appendChild(category);
+        extra.appendChild(toolDiv);
       }
 
       // Render citations
